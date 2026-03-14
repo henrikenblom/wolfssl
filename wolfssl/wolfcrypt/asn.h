@@ -2609,6 +2609,8 @@ WOLFSSL_LOCAL int AllocDer(DerBuffer** der, word32 length, int type,
     void* heap);
 WOLFSSL_LOCAL int AllocCopyDer(DerBuffer** der, const unsigned char* buff,
     word32 length, int type, void* heap);
+WOLFSSL_LOCAL int AllocWrapDer(DerBuffer** der, const unsigned char* buff,
+    word32 length, int type, void* heap);
 WOLFSSL_LOCAL void FreeDer(DerBuffer** der);
 
 #ifdef WOLFSSL_ASN_PARSE_KEYUSAGE

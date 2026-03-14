@@ -24970,34 +24970,54 @@ int ParseCert(DecodedCert* cert, int type, int verify, void* cm)
 
 #if (!defined(WOLFSSL_NO_MALLOC) && !defined(NO_WOLFSSL_CM_VERIFY)) || \
     defined(WOLFSSL_DYN_CERT)
-    /* cert->subjectCN not stored as copy of WOLFSSL_NO_MALLOC defined */
+    /* cert->subjectCN not stored as copy if WOLFSSL_NO_MALLOC defined.
+     * Skip copy if subjectCN points to persistent flash XIP memory. */
     if (cert->subjectCNLen > 0) {
-        ptr = (char*)XMALLOC((size_t)cert->subjectCNLen + 1, cert->heap,
-                              DYNAMIC_TYPE_SUBJECT_CN);
-        if (ptr == NULL)
-            return MEMORY_E;
-        XMEMCPY(ptr, cert->subjectCN, (size_t)cert->subjectCNLen);
-        ptr[cert->subjectCNLen] = '\0';
-        cert->subjectCN = ptr;
-        cert->subjectCNStored = 1;
+    #ifdef WOLFSSL_XIP_BASE
+        if ((uintptr_t)cert->subjectCN >= WOLFSSL_XIP_BASE &&
+            (uintptr_t)cert->subjectCN < WOLFSSL_XIP_BASE + WOLFSSL_XIP_SIZE) {
+            cert->subjectCNStored = 1;
+        }
+        else
+    #endif
+        {
+            ptr = (char*)XMALLOC((size_t)cert->subjectCNLen + 1, cert->heap,
+                                  DYNAMIC_TYPE_SUBJECT_CN);
+            if (ptr == NULL)
+                return MEMORY_E;
+            XMEMCPY(ptr, cert->subjectCN, (size_t)cert->subjectCNLen);
+            ptr[cert->subjectCNLen] = '\0';
+            cert->subjectCN = ptr;
+            cert->subjectCNStored = 1;
+        }
     }
 #endif
 
 #if (!defined(WOLFSSL_NO_MALLOC) && !defined(NO_WOLFSSL_CM_VERIFY)) || \
     defined(WOLFSSL_DYN_CERT)
-    /* cert->publicKey not stored as copy if WOLFSSL_NO_MALLOC defined */
+    /* cert->publicKey not stored as copy if WOLFSSL_NO_MALLOC defined.
+     * Skip copy if publicKey points to persistent flash XIP memory. */
     if ((cert->keyOID == RSAk
     #ifdef WC_RSA_PSS
          || cert->keyOID == RSAPSSk
     #endif
          ) && cert->publicKey != NULL && cert->pubKeySize > 0) {
-        ptr = (char*)XMALLOC(cert->pubKeySize, cert->heap,
-                              DYNAMIC_TYPE_PUBLIC_KEY);
-        if (ptr == NULL)
-            return MEMORY_E;
-        XMEMCPY(ptr, cert->publicKey, cert->pubKeySize);
-        cert->publicKey = (byte *)ptr;
-        cert->pubKeyStored = 1;
+    #ifdef WOLFSSL_XIP_BASE
+        if ((uintptr_t)cert->publicKey >= WOLFSSL_XIP_BASE &&
+            (uintptr_t)cert->publicKey < WOLFSSL_XIP_BASE + WOLFSSL_XIP_SIZE) {
+            cert->pubKeyStored = 1;
+        }
+        else
+    #endif
+        {
+            ptr = (char*)XMALLOC(cert->pubKeySize, cert->heap,
+                                  DYNAMIC_TYPE_PUBLIC_KEY);
+            if (ptr == NULL)
+                return MEMORY_E;
+            XMEMCPY(ptr, cert->publicKey, cert->pubKeySize);
+            cert->publicKey = (byte *)ptr;
+            cert->pubKeyStored = 1;
+        }
     }
 #endif
 
@@ -27072,6 +27092,32 @@ int AllocCopyDer(DerBuffer** pDer, const unsigned char* buff, word32 length,
         XMEMCPY((*pDer)->buffer, buff, length);
     }
 
+    return ret;
+}
+
+int AllocWrapDer(DerBuffer** pDer, const unsigned char* buff, word32 length,
+    int type, void* heap)
+{
+    int ret = BAD_FUNC_ARG;
+    if (pDer) {
+        int dynType = 0;
+        DerBuffer* der;
+        switch (type) {
+            case CA_TYPE:   dynType = DYNAMIC_TYPE_CA;   break;
+            case CERT_TYPE: dynType = DYNAMIC_TYPE_CERT; break;
+            default:        dynType = DYNAMIC_TYPE_KEY;  break;
+        }
+        *pDer = (DerBuffer*)XMALLOC(sizeof(DerBuffer), heap, dynType);
+        if (*pDer == NULL)
+            return MEMORY_E;
+        der = *pDer;
+        der->type = type;
+        der->dynType = dynType;
+        der->heap = heap;
+        der->buffer = (byte*)buff;
+        der->length = length;
+        ret = 0;
+    }
     return ret;
 }
 

@@ -8313,7 +8313,7 @@ int ecc_mul2add(ecc_point* A, mp_int* kA,
     /* allocate the table */
     if (err == MP_OKAY) {
         for (x = 0; x < SHAMIR_PRECOMP_SZ; x++) {
-        #ifdef WOLFSSL_NO_MALLOC
+        #if defined(WOLFSSL_NO_MALLOC) && !defined(WOLFSSL_SMALL_STACK)
             precomp[x] = &lcl_precomp[x];
         #endif
             err = wc_ecc_new_point_ex(&precomp[x], heap);
